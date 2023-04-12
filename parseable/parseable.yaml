@@ -1,0 +1,113 @@
+---
+# Source: parseable/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: parseable
+  labels:
+    helm.sh/chart: parseable-0.4.0
+    app.kubernetes.io/name: parseable
+    app.kubernetes.io/instance: parseable
+    app.kubernetes.io/version: "v0.4.0"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: parseable/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: parseable
+  namespace: parseable
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: parseable
+    app.kubernetes.io/instance: parseable
+---
+# Source: parseable/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: parseable
+  labels:
+    helm.sh/chart: parseable-0.4.0
+    app.kubernetes.io/name: parseable
+    app.kubernetes.io/instance: parseable
+    app.kubernetes.io/version: "v0.4.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: parseable
+      app.kubernetes.io/instance: parseable
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: parseable
+        app.kubernetes.io/instance: parseable
+    spec:
+      serviceAccountName: parseable
+      securityContext:
+       #allowPrivilegeEscalation: false
+        fsGroup: 1000
+        fsGroupChangePolicy: Always
+        runAsGroup: 1000
+        runAsUser: 1000
+      containers:
+        - name: parseable
+          securityContext:
+            allowPrivilegeEscalation: false
+          image: "parseable/parseable:v0.4.0"
+          imagePullPolicy: Always
+          # Uncomment to debug
+          # command: [ "/bin/sh", "-c", "sleep 1000000" ]
+          args: ["parseable", "local-store"]
+          env:
+            - name: P_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: parseable-env-secret
+                  key: addr
+            - name: P_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: parseable-env-secret
+                  key: username
+            - name: P_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: parseable-env-secret
+                  key: password
+            - name: P_STAGING_DIR
+              valueFrom:
+                secretKeyRef:
+                  name: parseable-env-secret
+                  key: staging.dir
+            - name: P_FS_DIR
+              valueFrom:
+                secretKeyRef:
+                  name: parseable-env-secret
+                  key: fs.dir
+          ports:
+            - containerPort: 8000
+          resources:
+            limits:
+              cpu: 500m
+              memory: 4Gi
+            requests:
+              cpu: 250m
+              memory: 1Gi
+          volumeMounts:
+          - mountPath: "/parseable/data"
+            name: data-volume
+          - mountPath: "/parseable/staging"
+            name: stage-volume
+      volumes:
+      - name: stage-volume
+        emptyDir: {}
+      - name: data-volume
+        emptyDir: {}
